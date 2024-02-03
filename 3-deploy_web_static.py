@@ -8,6 +8,8 @@ from datetime import datetime
 from os.path import exists
 
 env.hosts = ["54.175.223.125", "54.196.34.67"]
+""" The list of host server IP addresses. """
+
 
 def do_pack():
     """
@@ -44,7 +46,8 @@ def do_deploy(archive_path):
         run("mkdir -p {}".format(release_folder))
 
         # Unpack archive
-        run("tar -xzf /tmp/{} -C {}".format(archive_path.split("/")[-1], release_folder))
+        run("tar -xzf /tmp/{} -C {}"
+            .format(archive_path.split("/")[-1], release_folder))
 
         # Remove uploaded archive
         run("rm /tmp/{}".format(archive_path.split("/")[-1]))
