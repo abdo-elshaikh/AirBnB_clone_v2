@@ -1,8 +1,10 @@
 #!/usr/bin/python3
 """A module for web application deployment with Fabric."""
 import os
+import sys
 from datetime import datetime
 from fabric.api import env, local, put, run, runs_once
+from fabric.exceptions import NetworkError, CommandExecutionError
 
 
 env.hosts = ["54.175.223.125", "54.196.34.67"]
@@ -26,11 +28,12 @@ def do_pack():
     try:
         print("Packing web_static to {}".format(output))
         local("tar -cvzf {} web_static".format(output))
-        archize_size = os.stat(output).st_size
-        print("web_static packed: {} -> {} Bytes".format(output, archize_size))
-    except Exception:
-        output = None
-    return output
+        archive_size = os.stat(output).st_size
+        print("web_static packed: {} -> {} Bytes".format(output, archive_size))
+        return output
+    except Exception as e:
+        print("Error during packaging:", str(e))
+        return None
 
 
 def do_deploy(archive_path):
@@ -39,11 +42,13 @@ def do_deploy(archive_path):
         archive_path (str): The path to the archived static files.
     """
     if not os.path.exists(archive_path):
-        return False
+        print("Archive does not exist.")
+        sys.exit(1)
+
     file_name = os.path.basename(archive_path)
     folder_name = file_name.replace(".tgz", "")
     folder_path = "/data/web_static/releases/{}/".format(folder_name)
-    success = False
+
     try:
         put(archive_path, "/tmp/{}".format(file_name))
         run("mkdir -p {}".format(folder_path))
@@ -54,16 +59,8 @@ def do_deploy(archive_path):
         run("rm -rf /data/web_static/current")
         run("ln -s {} /data/web_static/current".format(folder_path))
         print('New version deployed!')
-        success = True
-    except Exception:
-        success = False
-    return success
+    except (NetworkError, CommandExecutionError) as e:
+        print("Error during deployment:", str(e))
+        sys.exit(1)
 
-if __name__ == "__main__":
-    archive_path = do_pack()
-    if not archive_path:
-        print("Nothing to deploy.")
-        exit(1)
-    do_deploy(archive_path)
-    print(archive_path)
-
+    return True
