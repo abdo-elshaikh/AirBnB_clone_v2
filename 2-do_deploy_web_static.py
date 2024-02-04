@@ -58,3 +58,12 @@ def do_deploy(archive_path):
     except Exception:
         success = False
     return success
+
+if __name__ == "__main__":
+    archive_path = do_pack()
+    if not archive_path:
+        print("Nothing to deploy.")
+        exit(1)
+    do_deploy(archive_path)
+    print(archive_path)
+
