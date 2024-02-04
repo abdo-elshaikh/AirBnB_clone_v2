@@ -1,87 +1,61 @@
 #!/usr/bin/python3
 """
-Fabric script that distributes an archive to your web servers
+Fabric script based on 2-do_deploy_web_static.py
 """
-
-from fabric.api import env, run, put, local
-from os.path import exists
+from fabric.api import env, local, put, run
 from datetime import datetime
+import os
 
-env.hosts = ['54.175.223.125', '54.196.34.67']
 env.user = 'ubuntu'
+env.hosts = ['54.175.223.125', '54.196.34.67']
 
 
 def do_pack():
     """
-    Generates a .tgz archive from the contents of the web_static
+    Create a tar archive of the web_static folder
     """
     try:
-        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-        archive_path = "versions/web_static_{}.tgz".format(timestamp)
-        local("mkdir -p versions")
+        if not os.path.exists("versions"):
+            local("mkdir -p versions")
+        date_format = datetime.now().strftime("%Y%m%d%H%M%S")
+        archive_path = "versions/web_static_{}.tgz".format(date_format)
         local("tar -cvzf {} web_static".format(archive_path))
         return archive_path
     except Exception as e:
-        print("Packaging failed: {}".format(e))
         return None
 
 
 def do_deploy(archive_path):
     """
-    Distributes an archive to your web servers using the function do_deploy
+    Deploy the archive to the web servers
     """
-    if not exists(archive_path):
+    if not os.path.exists(archive_path):
         return False
 
     try:
-        # Upload the archive to the /tmp/ directory of the web server
-        put(archive_path, '/tmp/')
+        filename = archive_path.split("/")[-1]
+        no_ext = filename.split(".")[0]
+        remote_path = "/data/web_static/releases/{}/".format(no_ext)
 
-        # Get the base name of the archive without the extension
-        archive_filename = archive_path.split('/')[-1].split('.')[0]
-
-        # Create the destination directory for the uncompressed archive
-        run('mkdir -p /data/web_static/releases/{}'
-            .format(archive_filename))
-
-        # Uncompress the archive to the destination directory
-        run('tar -xzf /tmp/{}.tgz -C /data/web_static/releases/{}/'
-            .format(archive_filename, archive_filename))
-
-        # Remove the archive from the web server
-        run('rm /tmp/{}.tgz'.format(archive_filename))
-
-        # Move the contents of the uncompressed archive to the web server
-        run('mv /data/web_static/releases/{}/web_static/* \
-            /data/web_static/releases/{}/'
-            .format(archive_filename, archive_filename))
-
-        # Remove the web_static directory inside the destination directory
-        run('rm -rf /data/web_static/releases/{}/web_static'
-            .format(archive_filename))
-
-        # Remove the current symbolic link
-        run('rm -rf /data/web_static/current')
-
-        # Create a new symbolic link linked to the new version of the code
-        run('ln -s /data/web_static/releases/{}/ /data/web_static/current'
-            .format(archive_filename))
-
-        print("New version deployed!")
+        put(archive_path, "/tmp/")
+        run("mkdir -p {}".format(remote_path))
+        run("tar -xzf /tmp/{} -C {}".format(filename, remote_path))
+        run("rm /tmp/{}".format(filename))
+        run("mv {}web_static/* {}".format(remote_path, remote_path))
+        run("rm -rf {}web_static".format(remote_path))
+        run("rm -rf /data/web_static/current")
+        run("ln -s {} /data/web_static/current".format(remote_path))
         return True
-
     except Exception as e:
-        print("Deployment failed: {}".format(e))
         return False
 
 
 def deploy():
-    """ Deploys archive """
+    """
+    Deploy the web_static archive to the web servers
+    """
     archive_path = do_pack()
     if not archive_path:
         return False
+
     return do_deploy(archive_path)
-
-
-if __name__ == "__main__":
-    deploy()
